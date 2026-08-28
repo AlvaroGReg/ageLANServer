@@ -1,20 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FluentProvider, webDarkTheme } from '@fluentui/react-components';
-import { AppConfig, DEFAULT_TOML_CONTENT } from './types';
+import { AppConfig } from './types';
 import { parseTOML } from './tomlUtils';
+import { ConfigService } from '../bindings/changeme';
 import { Screen1_FileLoad } from './components/Screen1_FileLoad';
 import { Screen2_ConfigEditor } from './components/Screen2_ConfigEditor';
 
 export function App() {
-  const [activeScreen, setActiveScreen] = useState<'screen1' | 'screen2'>('screen1');
-  const [loadedConfig, setLoadedConfig] = useState<AppConfig>(() => parseTOML(DEFAULT_TOML_CONTENT));
-  const [fileName, setFileName] = useState<string>('ageLANServer.toml');
+  const [loadedConfig, setLoadedConfig] = useState<AppConfig | null>(null);
+  const [fileName, setFileName] = useState<string>('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const hasStartedLoading = useRef(false);
 
-  const handleConfigLoaded = (config: AppConfig, name: string) => {
-    setLoadedConfig(config);
-    setFileName(name);
-    setActiveScreen('screen2');
+  const openConfigFile = () => {
+    setErrorMsg(null);
+    ConfigService.OpenConfigFile()
+      .then((file) => {
+        if (!file) return;
+        setLoadedConfig(parseTOML(file.content));
+        setFileName(file.path);
+      })
+      .catch((error: Error) => setErrorMsg(error.message));
   };
+
+  useEffect(() => {
+    if (hasStartedLoading.current) return;
+    hasStartedLoading.current = true;
+    openConfigFile();
+  }, []);
 
   // Custom transparent background theme override so Wails 3 backdrop effect is visible
   const customFluentTheme = {
@@ -34,14 +47,14 @@ export function App() {
         <div className="win-bg-backdrop" />
 
         <main className="win-main-content">
-          {activeScreen === 'screen1' ? (
-            <Screen1_FileLoad onConfigLoaded={handleConfigLoaded} />
-          ) : (
+          {loadedConfig ? (
             <Screen2_ConfigEditor
               initialConfig={loadedConfig}
               fileName={fileName}
-              onBack={() => setActiveScreen('screen1')}
+              onBack={() => setLoadedConfig(null)}
             />
+          ) : (
+            <Screen1_FileLoad onOpenConfig={openConfigFile} errorMsg={errorMsg || undefined} onError={setErrorMsg} />
           )}
         </main>
 
@@ -52,7 +65,7 @@ export function App() {
             <span>ageLANServer Configurator • Fluent UI React v9</span>
           </div>
           <div className="win-footer-info">
-            <span>Screen: {activeScreen === 'screen1' ? '1 / 2 (Load)' : '2 / 2 (Editor)'}</span>
+            <span>Screen: {loadedConfig ? '2 / 2 (Editor)' : '1 / 2 (Load)'}</span>
           </div>
         </footer>
       </div>

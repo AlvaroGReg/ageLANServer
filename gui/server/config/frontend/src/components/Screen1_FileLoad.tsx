@@ -19,15 +19,17 @@ import { AppConfig, DEFAULT_TOML_CONTENT } from '../types';
 import { parseTOML } from '../tomlUtils';
 
 interface Screen1Props {
-  onConfigLoaded: (config: AppConfig, fileName: string, rawText: string) => void;
+  onConfigLoaded?: (config: AppConfig, fileName: string, rawText: string) => void;
+  onOpenConfig?: () => void;
+  errorMsg?: string;
+  onError?: (message: string | null) => void;
 }
 
-export const Screen1_FileLoad: React.FC<Screen1Props> = ({ onConfigLoaded }) => {
+export const Screen1_FileLoad: React.FC<Screen1Props> = ({ onConfigLoaded, onOpenConfig, errorMsg, onError }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [loadedFileName, setLoadedFileName] = useState<string>('');
   const [loadedRawText, setLoadedRawText] = useState<string>('');
   const [parsedConfig, setParsedConfig] = useState<AppConfig | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processFileContent = (content: string, name: string) => {
@@ -36,9 +38,9 @@ export const Screen1_FileLoad: React.FC<Screen1Props> = ({ onConfigLoaded }) => 
       setParsedConfig(config);
       setLoadedFileName(name);
       setLoadedRawText(content);
-      setErrorMsg(null);
+      onError?.(null);
     } catch (err: any) {
-      setErrorMsg('Error al parsear el archivo TOML: ' + err.message);
+      onError?.('Error al parsear el archivo TOML: ' + err.message);
     }
   };
 
@@ -74,7 +76,7 @@ export const Screen1_FileLoad: React.FC<Screen1Props> = ({ onConfigLoaded }) => 
 
   const handleProceed = () => {
     if (parsedConfig && loadedRawText) {
-      onConfigLoaded(parsedConfig, loadedFileName || 'ageLANServer.toml', loadedRawText);
+      onConfigLoaded?.(parsedConfig, loadedFileName || 'ageLANServer.toml', loadedRawText);
     }
   };
 
@@ -95,10 +97,10 @@ export const Screen1_FileLoad: React.FC<Screen1Props> = ({ onConfigLoaded }) => 
       {/* Dropzone Card */}
       <div
         className={`win-dropzone ${isDragOver ? 'drag-over' : ''} ${parsedConfig ? 'has-file' : ''}`}
-        onDrop={handleDrop}
+        onDrop={(event) => onOpenConfig ? onOpenConfig() : handleDrop(event)}
         onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
         onDragLeave={() => setIsDragOver(false)}
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => onOpenConfig ? onOpenConfig() : fileInputRef.current?.click()}
       >
         <input
           type="file"
@@ -122,17 +124,17 @@ export const Screen1_FileLoad: React.FC<Screen1Props> = ({ onConfigLoaded }) => 
             <Button
               appearance="secondary"
               icon={<Folder24Regular />}
-              onClick={() => fileInputRef.current?.click()}
+              onClick={() => onOpenConfig ? onOpenConfig() : fileInputRef.current?.click()}
             >
               Browse File
             </Button>
-            <Button
+            {!onOpenConfig && <Button
               appearance="subtle"
               icon={<Flash24Regular />}
               onClick={loadDefaultConfig}
             >
               Load Default TOML
-            </Button>
+            </Button>}
           </div>
         </div>
       </div>
