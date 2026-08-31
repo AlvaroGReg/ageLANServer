@@ -7,5 +7,10 @@ export {
 };
 
 export type {
-    ConfigFile
+    AnnouncementConfig,
+    ConfigFile,
+    Configuration,
+    GameConfig,
+    GamesConfiguration,
+    ValidationError
 } from "./models.js";

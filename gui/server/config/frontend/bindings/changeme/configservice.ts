@@ -11,8 +11,17 @@ import * as $models from "./models.js";
 
 /**
  * OpenConfigFile finds the default file or asks the user to select one, then
- * returns its path and contents. Parsing and editing remain in the frontend by now.
+ * returns its path and raw contents. Parsing and editing are deliberately not
+ * part of this first loading step.
  */
 export function OpenConfigFile(): $CancellablePromise<$models.ConfigFile | null> {
     return $Call.ByID(1176887371);
+}
+
+/**
+ * SelectConfigFile always opens the native picker, even when a default file
+ * exists. It is used when the user explicitly wants another configuration.
+ */
+export function SelectConfigFile(): $CancellablePromise<$models.ConfigFile | null> {
+    return $Call.ByID(962140871);
 }
