@@ -34,6 +34,25 @@ import {
 } from '@fluentui/react-icons';
 import { AppConfig, ValidationErrors, AVAILABLE_GAMES } from '../types';
 import { stringifyTOML, validateIPv4, validateMulticastIPv4 } from '../tomlUtils';
+import { ConfigService, Configuration } from '../../bindings/changeme';
+
+function toServiceConfiguration(config: AppConfig): Configuration {
+    const game = (gameId: string) => ({ Hosts: config.Games[gameId]?.Hosts ?? [] });
+    return {
+        Log: config.Log,
+        GeneratePlatformUserId: config.GeneratePlatformUserId,
+        Authentication: config.Authentication,
+        Games: {
+            Enabled: config.Games.Enabled,
+            age1: game('age1'),
+            age2: game('age2'),
+            age3: game('age3'),
+            age4: game('age4'),
+            athens: game('athens'),
+        },
+        Announcement: config.Announcement,
+    };
+}
 
 interface Screen2Props {
     initialConfig: AppConfig;
@@ -52,9 +71,23 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
     const [showTomlModal, setShowTomlModal] = useState(false);
     const [hostsExpanded, setHostsExpanded] = useState(true);
 
+    // TODO: react validations need their own files
     // Validate fields whenever config changes
     useEffect(() => {
         const newErrors: ValidationErrors = {};
+
+        if (config.GeneratePlatformUserId && config.Authentication !== 'disabled') {
+            newErrors.GeneratePlatformUserId = 'Authentication must be disabled when generating platform user IDs.';
+        }
+
+        if (config.Games.Enabled.length === 0) {
+            newErrors['Games.Enabled'] = 'At least one game must be enabled.';
+        }
+        config.Games.Enabled.forEach((gameId, index) => {
+            if (!AVAILABLE_GAMES.some((game) => game.id === gameId)) {
+                newErrors[`Games.Enabled.${index}`] = `Unsupported game: ${gameId}`;
+            }
+        });
 
         // Validate Announcement Port
         if (isNaN(config.Announcement.Port) || config.Announcement.Port < 1 || config.Announcement.Port > 65535) {
@@ -62,7 +95,8 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
         }
 
         // Validate Announcement MulticastGroup (Class D Multicast 224.0.0.0 - 239.255.255.255)
-        if (!validateMulticastIPv4(config.Announcement.MulticastGroup)) {
+    if (config.Announcement.Enabled && config.Announcement.Multicast &&
+      !validateMulticastIPv4(config.Announcement.MulticastGroup)) {
             newErrors['Announcement.MulticastGroup'] = 'Valid Multicast IPv4 address required (Range: 224.0.0.0 to 239.255.255.255, e.g., 239.31.97.8)';
         }
 
@@ -131,10 +165,13 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
         });
     };
 
-    const handlePortChange = (val: number | null) => {
+    const handlePortChange = (val: number | string | null | undefined) => {
+        if (val == null || val === '') return;
+        const port = typeof val === 'string' ? Number.parseInt(val, 10) : val;
+        if (Number.isNaN(port)) return;
         setConfig({
             ...config,
-            Announcement: { ...config.Announcement, Port: val ?? 0 },
+            Announcement: { ...config.Announcement, Port: port },
         });
     };
 
@@ -154,15 +191,9 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
 
     const handleSave = () => {
         if (hasErrors) return;
-        const tomlStr = stringifyTOML(config);
-        const blob = new Blob([tomlStr], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName || 'ageLANServer.toml';
-        link.click();
-        URL.revokeObjectURL(url);
-        triggerToast('Configuration saved and downloaded successfully!');
+        ConfigService.SaveConfiguration(fileName, toServiceConfiguration(config))
+            .then(() => triggerToast('Configuration saved successfully.'))
+            .catch((error: Error) => triggerToast(`Error saving configuration: ${error.message}`));
     };
 
     const handleCopyToClipboard = () => {
@@ -447,7 +478,7 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                                         min={1}
                                         max={65535}
                                         value={config.Announcement.Port}
-                                        onChange={(_, data) => handlePortChange(data.value ?? 0)}
+                                        onChange={(_, data) => handlePortChange(data.value ?? data.displayValue)}
                                         aria-valuemin={1}
                                         aria-valuemax={65535}
                                         style={{ minWidth: 180 }}

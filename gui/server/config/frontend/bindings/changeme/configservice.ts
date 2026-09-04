@@ -19,6 +19,13 @@ export function OpenConfigFile(): $CancellablePromise<$models.ConfigFile | null>
 }
 
 /**
+ * SaveConfiguration validates and saves all editable configuration fields.
+ */
+export function SaveConfiguration(path: string, configuration: $models.Configuration): $CancellablePromise<void> {
+    return $Call.ByID(389537572, path, configuration);
+}
+
+/**
  * SelectConfigFile always opens the native picker, even when a default file
  * exists. It is used when the user explicitly wants another configuration.
  */

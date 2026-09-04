@@ -1,6 +1,11 @@
 package main
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestParseConfiguration(t *testing.T) {
 	config, err := parseConfiguration([]byte(`
@@ -57,7 +62,7 @@ func TestValidateConfiguration(t *testing.T) {
 			name: "valid",
 			config: Configuration{
 				Authentication: "disabled",
-				Games:          GamesConfiguration{Enabled: []string{"age2"}},
+				Games:          GamesConfiguration{Enabled: []string{"age2"}, Age2: GameConfig{Hosts: []string{"127.0.0.1"}}},
 				Announcement:   AnnouncementConfig{Port: 31978},
 			},
 		},
@@ -65,7 +70,7 @@ func TestValidateConfiguration(t *testing.T) {
 			name: "unknown authentication",
 			config: Configuration{
 				Authentication: "unknown",
-				Games:          GamesConfiguration{Enabled: []string{"age2"}},
+				Games:          GamesConfiguration{Enabled: []string{"age2"}, Age2: GameConfig{Hosts: []string{"127.0.0.1"}}},
 				Announcement:   AnnouncementConfig{Port: 31978},
 			},
 			field:     "Authentication",
@@ -84,7 +89,7 @@ func TestValidateConfiguration(t *testing.T) {
 			name: "unknown game",
 			config: Configuration{
 				Authentication: "disabled",
-				Games:          GamesConfiguration{Enabled: []string{"age5"}},
+				Games:          GamesConfiguration{Enabled: []string{"age5"}, Age2: GameConfig{Hosts: []string{"127.0.0.1"}}},
 				Announcement:   AnnouncementConfig{Port: 31978},
 			},
 			field:     "Games.Enabled.0",
@@ -105,5 +110,115 @@ func TestValidateConfiguration(t *testing.T) {
 				t.Fatalf("first error field = %q, want %q", errors[0].Field, testCase.field)
 			}
 		})
+	}
+}
+
+func TestValidateConfigurationMulticastIsConditional(t *testing.T) {
+	config := Configuration{
+		Authentication: "disabled",
+		Games:          GamesConfiguration{Enabled: []string{"age2"}, Age2: GameConfig{Hosts: []string{"127.0.0.1"}}},
+		Announcement: AnnouncementConfig{
+			Enabled:        true,
+			Multicast:      true,
+			Port:           31978,
+			MulticastGroup: "192.168.1.1",
+		},
+	}
+	errors := validateConfiguration(&config)
+	if len(errors) != 1 || errors[0].Field != "Announcement.MulticastGroup" {
+		t.Fatalf("unexpected multicast errors: %#v", errors)
+	}
+
+	config.Announcement.Multicast = false
+	if errors := validateConfiguration(&config); len(errors) != 0 {
+		t.Fatalf("disabled multicast returned errors: %#v", errors)
+	}
+}
+
+func TestReplaceAnnouncementPortPreservesDocument(t *testing.T) {
+	original := []byte("# Keep this comment.\nLog = false\n\n[Announcement] # Keep this section comment.\nPort = 31978 # Keep this inline comment.\nUnknown = 'keep me'\n")
+	updated, err := replaceDocumentValue(original, "Announcement", "Port", "32000")
+	if err != nil {
+		t.Fatalf("replaceDocumentValue returned an error: %v", err)
+	}
+	if !strings.Contains(string(updated), "# Keep this comment.") ||
+		!strings.Contains(string(updated), "# Keep this inline comment.") ||
+		!strings.Contains(string(updated), "Unknown = 'keep me'") {
+		t.Fatalf("replacement did not preserve the original document: %s", updated)
+	}
+	if !strings.Contains(string(updated), "Port = 32000 # Keep this inline comment.") {
+		t.Fatalf("replacement did not update the port: %s", updated)
+	}
+	config, err := parseConfiguration(updated)
+	if err != nil {
+		t.Fatalf("updated document could not be parsed: %v", err)
+	}
+	if config.Announcement.Port != 32000 {
+		t.Fatalf("updated port = %d, want 32000", config.Announcement.Port)
+	}
+}
+
+func TestWriteConfigFileReplacesExistingFile(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "config.toml")
+	if err := os.WriteFile(path, []byte("old"), 0600); err != nil {
+		t.Fatalf("create test configuration: %v", err)
+	}
+	if err := writeConfigFile(path, []byte("new")); err != nil {
+		t.Fatalf("writeConfigFile returned an error: %v", err)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read replaced configuration: %v", err)
+	}
+	if string(content) != "new" {
+		t.Fatalf("replaced content = %q, want %q", content, "new")
+	}
+}
+
+func TestSaveConfigurationDoesNotOverwriteInvalidConfiguration(t *testing.T) {
+	directory := t.TempDir()
+	path := filepath.Join(directory, "config.toml")
+	original := []byte(`Log = false
+GeneratePlatformUserId = false
+Authentication = 'disabled'
+
+[Games]
+Enabled = ['age2']
+
+[Games.age2]
+Hosts = ['127.0.0.1']
+
+[Announcement]
+Enabled = true
+Multicast = false
+Port = 31978
+MulticastGroup = '239.31.97.8'
+`)
+	if err := os.WriteFile(path, original, 0600); err != nil {
+		t.Fatalf("create test configuration: %v", err)
+	}
+
+	configuration := Configuration{
+		Authentication: "disabled",
+		Games:          GamesConfiguration{Enabled: []string{"age2"}, Age2: GameConfig{Hosts: []string{"127.0.0.1"}}},
+		Announcement:   AnnouncementConfig{Port: 0},
+	}
+	if err := (&ConfigService{}).SaveConfiguration(path, configuration); err == nil {
+		t.Fatal("SaveConfiguration accepted an invalid configuration")
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read unchanged configuration: %v", err)
+	}
+	if string(content) != string(original) {
+		t.Fatalf("invalid save changed the configuration: %s", content)
+	}
+}
+
+func TestSaveConfigurationReportsMissingPath(t *testing.T) {
+	configuration := Configuration{Authentication: "disabled"}
+	if err := (&ConfigService{}).SaveConfiguration(filepath.Join(t.TempDir(), "missing.toml"), configuration); err == nil {
+		t.Fatal("SaveConfiguration accepted a missing path")
 	}
 }
