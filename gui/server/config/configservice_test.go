@@ -51,6 +51,40 @@ func TestParseConfigurationRejectsInvalidType(t *testing.T) {
 	}
 }
 
+func TestContainsConfigurationField(t *testing.T) {
+	if hasFields, err := containsConfigurationField([]byte("[other]\nValue = true")); err != nil || hasFields {
+		t.Fatalf("unrelated TOML was identified as configuration: fields=%v, err=%v", hasFields, err)
+	}
+	if hasFields, err := containsConfigurationField([]byte("[Announcement]\nPort = 0")); err != nil || !hasFields {
+		t.Fatalf("invalid known field was not identified: fields=%v, err=%v", hasFields, err)
+	}
+}
+
+func TestReadConfigFileAcceptsInvalidKnownValues(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	content := []byte("Authentication = 'unsupported'\n")
+	if err := os.WriteFile(path, content, 0600); err != nil {
+		t.Fatalf("create test configuration: %v", err)
+	}
+	file, err := (&ConfigService{}).readConfigFile(path)
+	if err != nil {
+		t.Fatalf("readConfigFile rejected a known but invalid value: %v", err)
+	}
+	if len(file.ValidationErrors) == 0 || file.ValidationErrors[0].Field != "Authentication" {
+		t.Fatalf("unexpected validation errors: %#v", file.ValidationErrors)
+	}
+}
+
+func TestReadConfigFileRejectsUnrelatedTOML(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[other]\nValue = true\n"), 0600); err != nil {
+		t.Fatalf("create test configuration: %v", err)
+	}
+	if _, err := (&ConfigService{}).readConfigFile(path); err == nil {
+		t.Fatal("readConfigFile accepted TOML without supported configuration fields")
+	}
+}
+
 func TestValidateConfiguration(t *testing.T) {
 	cases := []struct {
 		name      string

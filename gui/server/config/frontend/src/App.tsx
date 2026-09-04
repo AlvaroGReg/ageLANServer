@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FluentProvider, webDarkTheme } from '@fluentui/react-components';
-import { ConfigFile, ConfigService, Configuration, ValidationError } from '../bindings/changeme';
+import { ConfigFile, ConfigService, Configuration } from '../bindings/changeme';
 import { AppConfig } from './types';
 import { Screen1_FileLoad } from './components/Screen1_FileLoad';
 import { Screen2_ConfigEditor } from './components/Screen2_ConfigEditor';
@@ -26,7 +26,6 @@ function toEditorConfig(config: Configuration): AppConfig {
 export function App() {
     const [loadedFile, setLoadedFile] = useState<ConfigFile | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
-    const [validationErrors, setValidationErrors] = useState<ValidationError[]>([]);
     const hasStartedLoading = useRef(false);
 
     const openConfigFile = () => {
@@ -34,12 +33,6 @@ export function App() {
         ConfigService.OpenConfigFile()
             .then((file) => {
                 if (!file) return;
-                if (file.validationErrors?.length) {
-                    setValidationErrors(file.validationErrors);
-                    setLoadedFile(null);
-                    return;
-                }
-                setValidationErrors([]);
                 setLoadedFile(file);
             })
             .catch((error: Error) => setErrorMsg(error.message));
@@ -50,12 +43,6 @@ export function App() {
         ConfigService.SelectConfigFile()
             .then((file) => {
                 if (!file) return;
-                if (file.validationErrors?.length) {
-                    setValidationErrors(file.validationErrors);
-                    setLoadedFile(null);
-                    return;
-                }
-                setValidationErrors([]);
                 setLoadedFile(file);
             })
             .catch((error: Error) => setErrorMsg(error.message));
@@ -89,6 +76,7 @@ export function App() {
                         <Screen2_ConfigEditor
                             initialConfig={toEditorConfig(loadedFile.config!)}
                             originalContent={loadedFile.content}
+                            backendValidationErrors={loadedFile.validationErrors ?? []}
                             fileName={loadedFile.path}
                             onBack={() => setLoadedFile(null)}
                         />
@@ -96,7 +84,6 @@ export function App() {
                         <Screen1_FileLoad
                             onSelectConfig={selectConfigFile}
                             errorMsg={errorMsg || undefined}
-                            validationErrors={validationErrors}
                         />
                     )}
                 </main>

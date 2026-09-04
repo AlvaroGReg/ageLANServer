@@ -118,12 +118,65 @@ func (s *ConfigService) readConfigFile(path string) (*ConfigFile, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse configuration file %q: %w", path, err)
 	}
+	hasFields, err := containsConfigurationField(content)
+	if err != nil {
+		return nil, fmt.Errorf("inspect configuration file %q: %w", path, err)
+	}
+	if !hasFields {
+		return nil, fmt.Errorf("configuration file %q does not contain supported configuration fields", path)
+	}
 	return &ConfigFile{
 		Path:             path,
 		Content:          string(content),
 		Config:           config,
 		ValidationErrors: validateConfiguration(config),
 	}, nil
+}
+
+// containsConfigurationField reports whether a TOML document contains a field
+// understood by the configuration editor, regardless of that field's value.
+func containsConfigurationField(content []byte) (bool, error) {
+	parser := &unstable.Parser{KeepComments: true}
+	parser.Reset(content)
+	section := ""
+	for parser.NextExpression() {
+		expression := parser.Expression()
+		switch expression.Kind {
+		case unstable.Table:
+			section = nodePath(expression)
+		case unstable.KeyValue:
+			if isConfigurationField(section, nodeKey(expression)) {
+				return true, nil
+			}
+		}
+	}
+	if err := parser.Error(); err != nil {
+		return false, fmt.Errorf("invalid TOML: %w", err)
+	}
+	return false, nil
+}
+
+// isConfigurationField identifies keys belonging to the public GUI contract.
+func isConfigurationField(section string, key string) bool {
+	if section == "" {
+		switch key {
+		case "Log", "GeneratePlatformUserId", "Authentication":
+			return true
+		}
+	}
+	if section == "Games" && key == "Enabled" {
+		return true
+	}
+	if section == "Announcement" {
+		switch key {
+		case "Enabled", "Multicast", "Port", "MulticastGroup":
+			return true
+		}
+	}
+	if strings.HasPrefix(section, "Games.") && key == "Hosts" {
+		return true
+	}
+	return false
 }
 
 // parseConfiguration decodes TOML into the public configuration model.

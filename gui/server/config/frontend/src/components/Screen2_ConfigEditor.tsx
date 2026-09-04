@@ -34,7 +34,7 @@ import {
 } from '@fluentui/react-icons';
 import { AppConfig, ValidationErrors, AVAILABLE_GAMES } from '../types';
 import { validateIPv4, validateMulticastIPv4 } from '../validation';
-import { ConfigService, Configuration } from '../../bindings/changeme';
+import { ConfigService, Configuration, ValidationError } from '../../bindings/changeme';
 
 function toServiceConfiguration(config: AppConfig): Configuration {
     const game = (gameId: string) => ({ Hosts: config.Games[gameId]?.Hosts ?? [] });
@@ -57,6 +57,7 @@ function toServiceConfiguration(config: AppConfig): Configuration {
 interface Screen2Props {
     initialConfig: AppConfig;
     originalContent: string;
+    backendValidationErrors: ValidationError[];
     fileName: string;
     onBack: () => void;
 }
@@ -64,11 +65,13 @@ interface Screen2Props {
 export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
     initialConfig,
     originalContent,
+    backendValidationErrors,
     fileName,
     onBack,
 }) => {
     const [config, setConfig] = useState<AppConfig>(initialConfig);
     const [errors, setErrors] = useState<ValidationErrors>({});
+    const [backendErrors, setBackendErrors] = useState(backendValidationErrors);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [showTomlModal, setShowTomlModal] = useState(false);
     const [hostsExpanded, setHostsExpanded] = useState(true);
@@ -113,10 +116,27 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
             });
         });
 
+        const usedHosts = new Set<string>();
+        config.Games.Enabled.forEach((gameId) => {
+            const hosts = config.Games[gameId]?.Hosts ?? [];
+            hosts.forEach((host) => {
+                const normalizedHost = host.trim();
+                if (usedHosts.has(normalizedHost)) {
+                    newErrors[`Games.${gameId}.Hosts.0`] = 'A host cannot be shared by enabled games.';
+                }
+                usedHosts.add(normalizedHost);
+            });
+        });
+
         setErrors(newErrors);
+        setBackendErrors((previous) => previous.filter((error) => newErrors[error.field]));
     }, [config]);
 
-    const hasErrors = Object.keys(errors).length > 0;
+    const backendErrorMap: ValidationErrors = Object.fromEntries(
+        backendErrors.map((error) => [error.field, error.message]),
+    );
+    const allErrors = { ...backendErrorMap, ...errors };
+    const hasErrors = Object.keys(allErrors).length > 0;
 
     // State handlers
     const handleToggleLog = (checked: boolean) => setConfig({ ...config, Log: checked });
@@ -252,6 +272,15 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                     <MessageBarBody>
                         <MessageBarTitle>Validation Errors</MessageBarTitle>
                         There are fields with errors. Please correct them to enable saving.
+                        {backendErrors.length > 0 && (
+                            <ul>
+                                {backendErrors.map((error) => (
+                                    <li key={`${error.field}-${error.message}`}>
+                                        <strong>{error.field}</strong>: {error.message}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
                     </MessageBarBody>
                 </MessageBar>
             )}
@@ -262,7 +291,7 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                 <div className="win-card-stack">
                     {/* Card 1: Log */}
                     <Card className="win-card">
-                        <div className="win-setting-row-main">
+                        <div className="win-setting-row-main win-game-selection-row">
                             <div className="win-setting-icon"><DocumentText24Regular /></div>
                             <div className="win-setting-text">
                                 <div className="win-setting-title">Log Information</div>
@@ -345,7 +374,7 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                                 </div>
                             </div>
                             <div className="win-setting-control">
-                                <div className="win-pills-group">
+                                <div className="win-pills-group win-game-pills">
                                     {AVAILABLE_GAMES.map((game) => {
                                         const isEnabled = config.Games.Enabled.includes(game.id);
                                         return (
@@ -389,7 +418,7 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                                         const gameConf = config.Games[game.id];
                                         const gameHosts = gameConf && Array.isArray(gameConf.Hosts) ? gameConf.Hosts : ['0.0.0.0'];
                                         const hostStr = gameHosts.join(', ');
-                                        const hostError = errors[`Games.${game.id}.Hosts.0`];
+                                         const hostError = allErrors[`Games.${game.id}.Hosts.0`];
 
                                         return (
                                             <div key={game.id} className="win-host-card">
@@ -472,8 +501,8 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                             </div>
                             <div className="win-setting-control">
                                 <Field
-                                    validationMessage={errors['Announcement.Port']}
-                                    validationState={errors['Announcement.Port'] ? 'error' : 'none'}
+                                    validationMessage={allErrors['Announcement.Port']}
+                                    validationState={allErrors['Announcement.Port'] ? 'error' : 'none'}
                                 >
                                     <SpinButton
                                         min={1}
@@ -501,8 +530,8 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                             </div>
                             <div className="win-setting-control">
                                 <Field
-                                    validationMessage={errors['Announcement.MulticastGroup']}
-                                    validationState={errors['Announcement.MulticastGroup'] ? 'error' : 'none'}
+                                    validationMessage={allErrors['Announcement.MulticastGroup']}
+                                    validationState={allErrors['Announcement.MulticastGroup'] ? 'error' : 'none'}
                                 >
                                     <Input
                                         value={config.Announcement.MulticastGroup}

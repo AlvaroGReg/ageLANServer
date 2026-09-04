@@ -333,6 +333,16 @@ html, body {
   flex-shrink: 0;
 }
 
+.win-game-selection-row {
+  display: grid;
+  grid-template-columns: 36px minmax(190px, 0.7fr) minmax(0, 2fr);
+  align-items: center;
+}
+
+.win-game-selection-row .win-setting-control {
+  min-width: 0;
+}
+
 .win-setting-expand-btn {
   background: none;
   border: none;
@@ -513,6 +523,17 @@ html, body {
   gap: 8px;
 }
 
+.win-game-pills {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  width: 100%;
+}
+
+.win-game-pills button {
+  width: 100%;
+  min-width: 0;
+}
+
 .win-pill {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -560,6 +581,16 @@ html, body {
 .win-host-name {
   font-size: 12.5px;
   font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .win-game-selection-row {
+    grid-template-columns: 36px minmax(0, 1fr);
+  }
+
+  .win-game-selection-row .win-setting-control {
+    grid-column: 2;
+  }
 }
 
 .win-host-code {
