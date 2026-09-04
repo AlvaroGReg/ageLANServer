@@ -88,6 +88,7 @@ export function App() {
                     {loadedFile ? (
                         <Screen2_ConfigEditor
                             initialConfig={toEditorConfig(loadedFile.config!)}
+                            originalContent={loadedFile.content}
                             fileName={loadedFile.path}
                             onBack={() => setLoadedFile(null)}
                         />

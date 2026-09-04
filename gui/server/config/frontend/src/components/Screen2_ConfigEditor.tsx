@@ -33,7 +33,7 @@ import {
     ChevronUp24Regular,
 } from '@fluentui/react-icons';
 import { AppConfig, ValidationErrors, AVAILABLE_GAMES } from '../types';
-import { stringifyTOML, validateIPv4, validateMulticastIPv4 } from '../tomlUtils';
+import { validateIPv4, validateMulticastIPv4 } from '../validation';
 import { ConfigService, Configuration } from '../../bindings/changeme';
 
 function toServiceConfiguration(config: AppConfig): Configuration {
@@ -56,12 +56,14 @@ function toServiceConfiguration(config: AppConfig): Configuration {
 
 interface Screen2Props {
     initialConfig: AppConfig;
+    originalContent: string;
     fileName: string;
     onBack: () => void;
 }
 
 export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
     initialConfig,
+    originalContent,
     fileName,
     onBack,
 }) => {
@@ -197,8 +199,7 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
     };
 
     const handleCopyToClipboard = () => {
-        const tomlStr = stringifyTOML(config);
-        navigator.clipboard.writeText(tomlStr);
+        navigator.clipboard.writeText(originalContent);
         triggerToast('TOML content copied to clipboard.');
     };
 
@@ -528,9 +529,9 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
             <Dialog open={showTomlModal} onOpenChange={(_, data) => setShowTomlModal(data.open)}>
                 <DialogSurface>
                     <DialogBody>
-                        <DialogTitle>Preview of Generated TOML</DialogTitle>
+                        <DialogTitle>Original TOML document</DialogTitle>
                         <DialogContent>
-                            <pre className="win-toml-code">{stringifyTOML(config)}</pre>
+                            <pre className="win-toml-code">{originalContent}</pre>
                         </DialogContent>
                         <DialogActions>
                             <Button appearance="secondary" onClick={handleCopyToClipboard}>
