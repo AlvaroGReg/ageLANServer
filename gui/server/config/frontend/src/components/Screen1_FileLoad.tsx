@@ -13,11 +13,12 @@ import { ValidationError } from '../../bindings/changeme';
 
 interface Screen1Props {
     onSelectConfig?: () => void;
+    onCreateConfig?: () => void;
     errorMsg?: string;
     validationErrors?: ValidationError[];
 }
 
-export const Screen1_FileLoad: React.FC<Screen1Props> = ({ onSelectConfig, errorMsg, validationErrors = [] }) => {
+export const Screen1_FileLoad: React.FC<Screen1Props> = ({ onSelectConfig, onCreateConfig, errorMsg, validationErrors = [] }) => {
     return (
         <div className="win-screen-container">
             {/* Header Banner */}
@@ -34,6 +35,8 @@ export const Screen1_FileLoad: React.FC<Screen1Props> = ({ onSelectConfig, error
 
             {/* Dropzone Card */}
             <div
+                id="config-dropzone"
+                data-file-drop-target
                 className="win-dropzone"
                 onClick={() => onSelectConfig?.()}
             >
@@ -44,7 +47,7 @@ export const Screen1_FileLoad: React.FC<Screen1Props> = ({ onSelectConfig, error
 
                     <div className="win-dropzone-text">
                         <h3>Select your <span>config.toml</span> file</h3>
-                        <p>or click to browse your computer</p>
+                         <p>or drag a TOML file here, or click to browse</p>
                     </div>
 
                     <div className="win-dropzone-actions" onClick={(e) => e.stopPropagation()}>
@@ -57,6 +60,12 @@ export const Screen1_FileLoad: React.FC<Screen1Props> = ({ onSelectConfig, error
                         </Button>
                     </div>
                 </div>
+            </div>
+
+            <div className="win-dropzone-actions" style={{ justifyContent: 'center', marginBottom: 20 }}>
+                <Button appearance="primary" icon={<DocumentText24Regular />} onClick={() => onCreateConfig?.()}>
+                    Create New Configuration
+                </Button>
             </div>
 
             {errorMsg && (

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FluentProvider, webDarkTheme } from '@fluentui/react-components';
+import { Events } from '@wailsio/runtime';
 import { ConfigFile, ConfigService, Configuration } from '../bindings/changeme';
 import { AppConfig } from './types';
 import { Screen1_FileLoad } from './components/Screen1_FileLoad';
@@ -48,10 +49,38 @@ export function App() {
             .catch((error: Error) => setErrorMsg(error.message));
     };
 
+    const createConfigFile = () => {
+        setErrorMsg(null);
+        ConfigService.OpenTemplate()
+            .then((file) => {
+                if (!file) return;
+                setLoadedFile(file);
+            })
+            .catch((error: Error) => setErrorMsg(error.message));
+    };
+
     useEffect(() => {
         if (hasStartedLoading.current) return;
         hasStartedLoading.current = true;
         openConfigFile();
+    }, []);
+
+    useEffect(() => {
+        return Events.On('files-dropped', (event) => {
+            const data = event.data as { files?: string[] } | undefined;
+            const droppedPath = data?.files?.[0];
+            if (!droppedPath) {
+                setErrorMsg('No file path was received from the dropped item.');
+                return;
+            }
+            setErrorMsg(null);
+            ConfigService.OpenConfigFileAtPath(droppedPath)
+                .then((file) => {
+                    if (!file) return;
+                    setLoadedFile(file);
+                })
+                .catch((error: Error) => setErrorMsg(error.message));
+        });
     }, []);
 
     // Custom transparent background theme override so Wails 3 backdrop effect is visible
@@ -78,12 +107,16 @@ export function App() {
                             originalContent={loadedFile.content}
                             backendValidationErrors={loadedFile.validationErrors ?? []}
                             fileName={loadedFile.path}
+                            isNew={!loadedFile.path}
+                            onSaved={setLoadedFile}
                             onBack={() => setLoadedFile(null)}
                         />
                     ) : (
                         <Screen1_FileLoad
                             onSelectConfig={selectConfigFile}
+                            onCreateConfig={createConfigFile}
                             errorMsg={errorMsg || undefined}
+                            validationErrors={[]}
                         />
                     )}
                 </main>

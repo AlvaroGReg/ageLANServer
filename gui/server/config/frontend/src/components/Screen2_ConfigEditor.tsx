@@ -34,7 +34,7 @@ import {
 } from '@fluentui/react-icons';
 import { AppConfig, ValidationErrors, AVAILABLE_GAMES } from '../types';
 import { validateIPv4, validateMulticastIPv4 } from '../validation';
-import { ConfigService, Configuration, ValidationError } from '../../bindings/changeme';
+import { ConfigFile, ConfigService, Configuration, ValidationError } from '../../bindings/changeme';
 
 function toServiceConfiguration(config: AppConfig): Configuration {
     const game = (gameId: string) => ({ Hosts: config.Games[gameId]?.Hosts ?? [] });
@@ -59,6 +59,8 @@ interface Screen2Props {
     originalContent: string;
     backendValidationErrors: ValidationError[];
     fileName: string;
+    isNew: boolean;
+    onSaved: (file: ConfigFile) => void;
     onBack: () => void;
 }
 
@@ -67,6 +69,8 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
     originalContent,
     backendValidationErrors,
     fileName,
+    isNew,
+    onSaved,
     onBack,
 }) => {
     const [config, setConfig] = useState<AppConfig>(initialConfig);
@@ -211,11 +215,36 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
         }, 4000);
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (hasErrors) return;
-        ConfigService.SaveConfiguration(fileName, toServiceConfiguration(config))
-            .then(() => triggerToast('Configuration saved successfully.'))
-            .catch((error: Error) => triggerToast(`Error saving configuration: ${error.message}`));
+        try {
+            if (!isNew) {
+                await ConfigService.SaveConfiguration(fileName, toServiceConfiguration(config));
+                triggerToast('Configuration saved successfully.');
+                return;
+            }
+
+            const destination = await ConfigService.SelectConfigDestination();
+            if (!destination) return;
+            try {
+                const created = await ConfigService.CreateConfigFile(destination, toServiceConfiguration(config), false);
+                if (!created) throw new Error('The created configuration was not returned.');
+                onSaved(created);
+                triggerToast('Configuration created successfully.');
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                if (!message.includes('confirmation required') || !window.confirm('The selected file already exists. Overwrite it?')) {
+                    throw error;
+                }
+                const created = await ConfigService.CreateConfigFile(destination, toServiceConfiguration(config), true);
+                if (!created) throw new Error('The overwritten configuration was not returned.');
+                onSaved(created);
+                triggerToast('Configuration overwritten successfully.');
+            }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            triggerToast(`Error saving configuration: ${message}`);
+        }
     };
 
     const handleCopyToClipboard = () => {
@@ -244,7 +273,7 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
 
                 <div className="win-top-title-group">
                     <h2>Configuration Editor</h2>
-                    <Badge appearance="tint" color="brand">{fileName}</Badge>
+                    <Badge appearance="tint" color="brand">{fileName || 'New configuration'}</Badge>
                 </div>
 
                 <div className="win-top-actions">

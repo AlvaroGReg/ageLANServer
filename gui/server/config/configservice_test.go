@@ -256,3 +256,88 @@ func TestSaveConfigurationReportsMissingPath(t *testing.T) {
 		t.Fatal("SaveConfiguration accepted a missing path")
 	}
 }
+
+func TestWriteNewConfigFileDoesNotOverwrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nested", "config.toml")
+	if err := writeNewConfigFile(path, []byte("new")); err != nil {
+		t.Fatalf("writeNewConfigFile returned an error: %v", err)
+	}
+	if err := writeNewConfigFile(path, []byte("replacement")); err == nil {
+		t.Fatal("writeNewConfigFile overwrote an existing file")
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read created configuration: %v", err)
+	}
+	if string(content) != "new" {
+		t.Fatalf("created content = %q, want %q", content, "new")
+	}
+}
+
+func TestCreateConfigFileUsesOfficialTemplate(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	configuration := Configuration{
+		Authentication: "disabled",
+		Games: GamesConfiguration{
+			Enabled: []string{"age2"},
+			Age2:    GameConfig{Hosts: []string{"127.0.0.1"}},
+		},
+		Announcement: AnnouncementConfig{
+			Enabled:        true,
+			Multicast:      false,
+			Port:           32000,
+			MulticastGroup: "239.31.97.8",
+		},
+	}
+	templatePath, err := templateConfigPath()
+	if err != nil {
+		t.Fatalf("templateConfigPath returned an error: %v", err)
+	}
+	templateContent, err := os.ReadFile(templatePath)
+	if err != nil {
+		t.Fatalf("read template: %v", err)
+	}
+	updated, err := configurationDocument(templateContent, configuration)
+	if err != nil {
+		t.Fatalf("configurationDocument returned an error: %v", err)
+	}
+	if _, err := parseConfiguration(updated); err != nil {
+		t.Fatalf("configurationDocument produced invalid TOML:\n%s\n%v", updated, err)
+	}
+	file, err := (&ConfigService{}).CreateConfigFile(path, configuration, false)
+	if err != nil {
+		t.Fatalf("CreateConfigFile returned an error: %v", err)
+	}
+	if file.Path != path || file.Config.Announcement.Port != 32000 {
+		t.Fatalf("unexpected created file: %+v", file)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read created configuration: %v", err)
+	}
+	if !strings.Contains(string(content), "# Whether to log all the info") {
+		t.Fatal("created configuration did not preserve the official template comments")
+	}
+}
+
+func TestCreateConfigFileRequiresOverwriteConfirmation(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("existing"), 0600); err != nil {
+		t.Fatalf("create existing configuration: %v", err)
+	}
+	configuration := Configuration{
+		Authentication: "disabled",
+		Games:          GamesConfiguration{Enabled: []string{"age2"}, Age2: GameConfig{Hosts: []string{"127.0.0.1"}}},
+		Announcement:   AnnouncementConfig{Port: 31978},
+	}
+	if _, err := (&ConfigService{}).CreateConfigFile(path, configuration, false); err == nil {
+		t.Fatal("CreateConfigFile did not require overwrite confirmation")
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read existing configuration: %v", err)
+	}
+	if string(content) != "existing" {
+		t.Fatalf("existing content changed after rejected creation: %q", content)
+	}
+}

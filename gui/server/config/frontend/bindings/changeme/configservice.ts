@@ -10,6 +10,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * CreateConfigFile validates a new document and creates it at the requested path.
+ */
+export function CreateConfigFile(path: string, configuration: $models.Configuration, overwrite: boolean): $CancellablePromise<$models.ConfigFile | null> {
+    return $Call.ByID(539612519, path, configuration, overwrite);
+}
+
+/**
  * OpenConfigFile finds the default file or asks the user to select one, then
  * returns its path and raw contents. Parsing and editing are deliberately not
  * part of this first loading step.
@@ -19,10 +26,31 @@ export function OpenConfigFile(): $CancellablePromise<$models.ConfigFile | null>
 }
 
 /**
+ * OpenConfigFileAtPath loads a configuration dropped onto the application window.
+ */
+export function OpenConfigFileAtPath(path: string): $CancellablePromise<$models.ConfigFile | null> {
+    return $Call.ByID(2068630133, path);
+}
+
+/**
+ * OpenTemplate loads the official server template as a new, unsaved document.
+ */
+export function OpenTemplate(): $CancellablePromise<$models.ConfigFile | null> {
+    return $Call.ByID(3590655485);
+}
+
+/**
  * SaveConfiguration validates and saves all editable configuration fields.
  */
 export function SaveConfiguration(path: string, configuration: $models.Configuration): $CancellablePromise<void> {
     return $Call.ByID(389537572, path, configuration);
+}
+
+/**
+ * SelectConfigDestination opens the native dialog used for a new configuration.
+ */
+export function SelectConfigDestination(): $CancellablePromise<string> {
+    return $Call.ByID(2401293339);
 }
 
 /**

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -52,6 +53,82 @@ func (s *ConfigService) SelectConfigFile() (*ConfigFile, error) {
 	return s.readConfigFile(path)
 }
 
+// OpenConfigFileAtPath loads a configuration dropped onto the application window.
+func (s *ConfigService) OpenConfigFileAtPath(path string) (*ConfigFile, error) {
+	if path == "" {
+		return nil, errors.New("dropped configuration path is empty")
+	}
+	return s.readConfigFile(path)
+}
+
+// OpenTemplate loads the official server template as a new, unsaved document.
+func (s *ConfigService) OpenTemplate() (*ConfigFile, error) {
+	path, err := templateConfigPath()
+	if err != nil {
+		return nil, err
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("read configuration template %q: %w", path, err)
+	}
+	config, err := parseConfiguration(content)
+	if err != nil {
+		return nil, fmt.Errorf("parse configuration template %q: %w", path, err)
+	}
+	return &ConfigFile{
+		Content:          string(content),
+		Config:           config,
+		ValidationErrors: validateConfiguration(config),
+	}, nil
+}
+
+// SelectConfigDestination opens the native dialog used for a new configuration.
+func (s *ConfigService) SelectConfigDestination() (string, error) {
+	path, err := application.Get().Dialog.SaveFile().
+		SetMessage("Choose where to create the configuration").
+		SetFilename(configFileName).
+		AddFilter("TOML files", "*.toml").
+		PromptForSingleSelection()
+	if err != nil {
+		return "", fmt.Errorf("open configuration destination picker: %w", err)
+	}
+	if path == "" {
+		return "", errors.New("no configuration destination selected")
+	}
+	return path, nil
+}
+
+// CreateConfigFile validates a new document and creates it at the requested path.
+func (s *ConfigService) CreateConfigFile(path string, configuration Configuration, overwrite bool) (*ConfigFile, error) {
+	template, err := s.OpenTemplate()
+	if err != nil {
+		return nil, err
+	}
+	if path == "" {
+		return nil, errors.New("configuration destination cannot be empty")
+	}
+	if _, err := os.Stat(path); err == nil && !overwrite {
+		return nil, fmt.Errorf("configuration file %q already exists; confirmation required", path)
+	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("check configuration destination %q: %w", path, err)
+	}
+	if validationErrors := validateConfiguration(&configuration); len(validationErrors) > 0 {
+		return nil, fmt.Errorf("configuration is invalid: %s", validationErrors[0].Message)
+	}
+	updated, err := configurationDocument([]byte(template.Content), configuration)
+	if err != nil {
+		return nil, fmt.Errorf("create configuration file %q: %w", path, err)
+	}
+	if overwrite {
+		if err := writeConfigFile(path, updated); err != nil {
+			return nil, err
+		}
+	} else if err := writeNewConfigFile(path, updated); err != nil {
+		return nil, err
+	}
+	return s.readConfigFile(path)
+}
+
 // SaveConfiguration validates and saves all editable configuration fields.
 func (s *ConfigService) SaveConfiguration(path string, configuration Configuration) error {
 	content, err := os.ReadFile(path)
@@ -67,6 +144,18 @@ func (s *ConfigService) SaveConfiguration(path string, configuration Configurati
 		return fmt.Errorf("configuration is invalid: %s", validationErrors[0].Message)
 	}
 
+	updated, err := configurationDocument(content, configuration)
+	if err != nil {
+		return fmt.Errorf("edit configuration file %q: %w", path, err)
+	}
+	if _, err := parseConfiguration(updated); err != nil {
+		return fmt.Errorf("validate edited configuration file %q: %w", path, err)
+	}
+	return writeConfigFile(path, updated)
+}
+
+// configurationDocument applies editable values without serializing the whole model.
+func configurationDocument(content []byte, configuration Configuration) ([]byte, error) {
 	updated := content
 	replacements := []struct {
 		section string
@@ -88,15 +177,13 @@ func (s *ConfigService) SaveConfiguration(path string, configuration Configurati
 		{"Announcement", "MulticastGroup", "'" + configuration.Announcement.MulticastGroup + "'"},
 	}
 	for _, replacement := range replacements {
+		var err error
 		updated, err = replaceDocumentValue(updated, replacement.section, replacement.key, replacement.value)
 		if err != nil {
-			return fmt.Errorf("edit configuration file %q: %w", path, err)
+			return nil, fmt.Errorf("replace %s.%s: %w", replacement.section, replacement.key, err)
 		}
 	}
-	if _, err := parseConfiguration(updated); err != nil {
-		return fmt.Errorf("validate edited configuration file %q: %w", path, err)
-	}
-	return writeConfigFile(path, updated)
+	return updated, nil
 }
 
 // tomlArray formats string values as a TOML array.
@@ -203,12 +290,25 @@ func replaceDocumentValue(content []byte, targetSection string, key string, repl
 			section = nodePath(expression)
 		case unstable.KeyValue:
 			if section == targetSection && nodeKey(expression) == key {
-				raw := expression.Value().Raw
+				raw := expression.Raw
+				rawContent := content[raw.Offset : raw.Offset+raw.Length]
+				equals := bytes.IndexByte(rawContent, '=')
+				if equals < 0 {
+					return nil, fmt.Errorf("key %s.%s has no assignment", targetSection, key)
+				}
+				valueOffset := int(raw.Offset) + equals + 1
+				for valueOffset < len(content) && (content[valueOffset] == ' ' || content[valueOffset] == '\t') {
+					valueOffset++
+				}
+				valueEnd := int(raw.Offset + raw.Length)
+				for valueEnd > valueOffset && (content[valueEnd-1] == ' ' || content[valueEnd-1] == '\t' || content[valueEnd-1] == '\r' || content[valueEnd-1] == '\n') {
+					valueEnd--
+				}
 				replacementBytes := []byte(replacement)
-				updated := make([]byte, 0, len(content)-int(raw.Length)+len(replacementBytes))
-				updated = append(updated, content[:raw.Offset]...)
+				updated := make([]byte, 0, len(content)-(valueEnd-valueOffset)+len(replacementBytes))
+				updated = append(updated, content[:valueOffset]...)
 				updated = append(updated, replacementBytes...)
-				updated = append(updated, content[raw.Offset+raw.Length:]...)
+				updated = append(updated, content[valueEnd:]...)
 				return updated, nil
 			}
 		}
@@ -251,6 +351,28 @@ func writeConfigFile(path string, content []byte) error {
 	defer os.Remove(temporaryPath)
 
 	return replaceConfigFile(path, temporaryPath)
+}
+
+// writeNewConfigFile creates a file without replacing an existing destination.
+func writeNewConfigFile(path string, content []byte) error {
+	directory := filepath.Dir(path)
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return fmt.Errorf("create configuration directory: %w", err)
+	}
+	if _, err := os.Stat(path); err == nil {
+		return fmt.Errorf("create configuration file: destination %q already exists", path)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("check configuration destination: %w", err)
+	}
+	temporaryPath, err := createTemporaryConfig(directory, content, 0o644)
+	if err != nil {
+		return err
+	}
+	defer os.Remove(temporaryPath)
+	if err := os.Rename(temporaryPath, path); err != nil {
+		return fmt.Errorf("create configuration file: %w", err)
+	}
+	return nil
 }
 
 // createTemporaryConfig writes content to a temporary file with the given permissions.
@@ -466,4 +588,27 @@ func defaultConfigPath() (string, error) {
 		}
 	}
 	return "", os.ErrNotExist
+}
+
+// templateConfigPath finds the official template in installed and development layouts.
+func templateConfigPath() (string, error) {
+	executable, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("find executable: %w", err)
+	}
+	executableDirectory := filepath.Dir(executable)
+	candidates := []string{
+		filepath.Join(executableDirectory, "resources", "config", configFileName),
+		filepath.Join(executableDirectory, "..", "..", "..", "..", "server", "resources", "config", configFileName),
+		filepath.Join("..", "..", "..", "server", "resources", "config", configFileName),
+		filepath.Join("server", "resources", "config", configFileName),
+	}
+	for _, candidate := range candidates {
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		} else if !os.IsNotExist(err) {
+			return "", fmt.Errorf("check configuration template %q: %w", candidate, err)
+		}
+	}
+	return "", fmt.Errorf("configuration template %q was not found", configFileName)
 }

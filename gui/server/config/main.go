@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
+	"github.com/wailsapp/wails/v3/pkg/events"
 )
 
 // Wails uses Go's `embed` package to embed the frontend files into the binary.
@@ -43,7 +44,7 @@ func main() {
 	// 'Mac' options tailor the window when running on macOS.
 	// 'BackgroundColour' is the background colour of the window.
 	// 'URL' is the URL that will be loaded into the webview.
-	app.Window.NewWithOptions(application.WebviewWindowOptions{
+	window := app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title: "Window 1",
 		// Window sized to the golden ratio (1000 / 618 ≈ 1.618).
 		Width:  1000,
@@ -54,7 +55,14 @@ func main() {
 			TitleBar:                application.MacTitleBarHiddenInset,
 		},
 		BackgroundColour: application.NewRGB(6, 7, 15),
+		EnableFileDrop:   true,
 		URL:              "/",
+	})
+	window.OnWindowEvent(events.Common.WindowFilesDropped, func(event *application.WindowEvent) {
+		application.Get().Event.Emit("files-dropped", map[string]any{
+			"files":   event.Context().DroppedFiles(),
+			"details": event.Context().DropTargetDetails(),
+		})
 	})
 
 	// Run the application. This blocks until the application has been exited.
