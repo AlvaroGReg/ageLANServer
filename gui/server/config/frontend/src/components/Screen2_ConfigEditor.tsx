@@ -397,7 +397,7 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                         <div className="win-setting-row-main">
                             <div className="win-setting-icon"><Games24Regular /></div>
                             <div className="win-setting-text">
-                                <div className="win-setting-title">Enabled Games (Games.Enabled)</div>
+                                <div className="win-setting-title">Enabled Games</div>
                                 <div className="win-setting-subtitle">
                                     Select which Age of Empires games the LAN server will accept.
                                 </div>
@@ -430,7 +430,7 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                         <div className="win-setting-row-main" onClick={() => setHostsExpanded(!hostsExpanded)} style={{ cursor: 'pointer' }}>
                             <div className="win-setting-icon"><Globe24Regular /></div>
                             <div className="win-setting-text">
-                                <div className="win-setting-title">Network Addresses per Game (Games.&lt;game&gt;.Hosts)</div>
+                                <div className="win-setting-title">Network Addresses per Game</div>
                                 <div className="win-setting-subtitle">
                                     Configure the IP to which the server will bind for each game (single IPv4).
                                 </div>
@@ -447,7 +447,7 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                                         const gameConf = config.Games[game.id];
                                         const gameHosts = gameConf && Array.isArray(gameConf.Hosts) ? gameConf.Hosts : ['0.0.0.0'];
                                         const hostStr = gameHosts.join(', ');
-                                         const hostError = allErrors[`Games.${game.id}.Hosts.0`];
+                                        const hostError = allErrors[`Games.${game.id}.Hosts.0`];
 
                                         return (
                                             <div key={game.id} className="win-host-card">
