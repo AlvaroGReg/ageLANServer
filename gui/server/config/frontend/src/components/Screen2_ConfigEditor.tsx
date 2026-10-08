@@ -28,8 +28,6 @@ import {
     Games24Regular,
     Megaphone24Regular,
     Globe24Regular,
-    ChevronDown24Regular,
-    ChevronUp24Regular,
 } from '@fluentui/react-icons';
 import { AppConfig, ValidationErrors, AVAILABLE_GAMES } from '../types';
 import { validateIPv4, validateMulticastIPv4 } from '../validation';
@@ -78,7 +76,6 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
     const [backendErrors, setBackendErrors] = useState(backendValidationErrors);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [showTomlModal, setShowTomlModal] = useState(false);
-    const [hostsExpanded, setHostsExpanded] = useState(true);
 
     // TODO: react validations need their own files
     // Validate fields whenever config changes
@@ -111,6 +108,8 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
 
         // Validate Game Hosts
         AVAILABLE_GAMES.forEach((game) => {
+            if (!config.Games.Enabled.includes(game.id)) return;
+
             const gameConf = config.Games[game.id];
             const hosts = gameConf && Array.isArray(gameConf.Hosts) ? gameConf.Hosts : [];
             hosts.forEach((host: string, idx: number) => {
@@ -393,85 +392,53 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
             <div className="win-card-group">
                 <h3 className="win-section-header">Supported Games and Binding Hosts</h3>
                 <div className="win-card-stack">
-                    {/* Card 4: Games Enabled */}
+                    {/* Card 4: Games and Binding Hosts */}
                     <Card className="win-card">
                         <div className="win-setting-row-main">
                             <div className="win-setting-icon"><Games24Regular /></div>
                             <div className="win-setting-text">
-                                <div className="win-setting-title">Enabled Games</div>
+                                <div className="win-setting-title">Games and Network Addresses</div>
                                 <div className="win-setting-subtitle">
-                                    Select which Age of Empires games the LAN server will accept.
-                                </div>
-                            </div>
-                            <div className="win-setting-control">
-                                <div className="win-pills-group win-game-pills">
-                                    {AVAILABLE_GAMES.map((game) => {
-                                        const isEnabled = config.Games.Enabled.includes(game.id);
-                                        return (
-                                            <Button
-                                                key={game.id}
-                                                appearance={isEnabled ? 'primary' : 'secondary'}
-                                                size="small"
-                                                shape="rounded"
-                                                onClick={() => handleGameToggle(game.id)}
-                                                style={{ backgroundColor: 'var(--colorNeutralBackground1)', color: 'var(--colorNeutralForeground1)', margin: '2px' }}
-                                            >
-                                                {isEnabled ? '✓ ' : '+ '}
-                                                {game.name}
-                                            </Button>
-                                        );
-                                    })}
+                                    Select the games the LAN server will accept and configure each binding IP (single IPv4).
                                 </div>
                             </div>
                         </div>
-                    </Card>
+                        <div className="win-setting-row-details">
+                            <div className="win-hosts-grid">
+                                {AVAILABLE_GAMES.map((game) => {
+                                    const isEnabled = config.Games.Enabled.includes(game.id);
+                                    const gameConf = config.Games[game.id];
+                                    const gameHosts = gameConf && Array.isArray(gameConf.Hosts) ? gameConf.Hosts : ['0.0.0.0'];
+                                    const hosts = gameHosts.length > 0 ? gameHosts : ['0.0.0.0'];
 
-                    {/* Card 5: Hosts Per Game */}
-                    <Card className="win-card">
-                        <div className="win-setting-row-main" onClick={() => setHostsExpanded(!hostsExpanded)} style={{ cursor: 'pointer' }}>
-                            <div className="win-setting-icon"><Globe24Regular /></div>
-                            <div className="win-setting-text">
-                                <div className="win-setting-title">Network Addresses per Game</div>
-                                <div className="win-setting-subtitle">
-                                    Configure the IP to which the server will bind for each game (single IPv4).
-                                </div>
-                            </div>
-                            <div className="win-setting-control">
-                                <Button appearance="subtle" icon={hostsExpanded ? <ChevronUp24Regular /> : <ChevronDown24Regular />} />
-                            </div>
-                        </div>
-
-                        {hostsExpanded && (
-                            <div className="win-setting-row-details">
-                                <div className="win-hosts-grid">
-                                    {AVAILABLE_GAMES.map((game) => {
-                                        const gameConf = config.Games[game.id];
-                                        const gameHosts = gameConf && Array.isArray(gameConf.Hosts) ? gameConf.Hosts : ['0.0.0.0'];
-                                        const hosts = gameHosts.length > 0 ? gameHosts : ['0.0.0.0'];
-
-                                        return (
-                                            <div key={game.id} className="win-host-card">
-                                                <div className="win-host-info">
-                                                    <span className="win-host-name">{game.name}</span>
-                                                </div>
-                                                {hosts.map((host, index) => {
-                                                    const hostError = allErrors[`Games.${game.id}.Hosts.${index}`];
-                                                    return (
-                                                        <Field key={index} validationMessage={hostError} validationState={hostError ? 'error' : 'none'}>
-                                                            <IPv4Input
-                                                                value={host}
-                                                                onChange={(value) => handleGameHostChange(game.id, index, value)}
-                                                                placeholder="0.0.0.0"
-                                                            />
-                                                        </Field>
-                                                    );
-                                                })}
+                                    return (
+                                        <div key={game.id} className="win-host-card">
+                                            <div className="win-host-info">
+                                                <span className="win-host-name">{game.name}</span>
+                                                <Switch
+                                                    checked={isEnabled}
+                                                    onChange={() => handleGameToggle(game.id)}
+                                                    aria-label={`Enable ${game.name}`}
+                                                />
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                            {hosts.map((host, index) => {
+                                                const hostError = allErrors[`Games.${game.id}.Hosts.${index}`];
+                                                return (
+                                                    <Field key={index} validationMessage={hostError} validationState={hostError ? 'error' : 'none'}>
+                                                        <IPv4Input
+                                                            value={host}
+                                                            onChange={(value) => handleGameHostChange(game.id, index, value)}
+                                                            placeholder="0.0.0.0"
+                                                            disabled={!isEnabled}
+                                                        />
+                                                    </Field>
+                                                );
+                                            })}
+                                        </div>
+                                    );
+                                })}
                             </div>
-                        )}
+                        </div>
                     </Card>
                 </div>
             </div>

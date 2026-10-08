@@ -64,7 +64,7 @@ body {
 
 .win-main-content {
     flex: 1;
-    max-width: 1280px;
+    max-width: 1440px;
     width: 100%;
     margin: 0 auto;
     padding: 32px 24px 80px 24px;
@@ -553,8 +553,8 @@ body {
 
 /* Hosts Grid in Details */
 .win-hosts-grid {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
     gap: 12px;
 }
 
@@ -563,31 +563,17 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: var(--win-radius-sm);
     padding: 12px;
-}
 
-.win-host-info {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
+    .win-host-info {
+        align-items: center;
+        display: flex;
+        justify-content: space-between;
 
-.win-host-name {
-    font-size: 12.5px;
-    font-weight: 600;
-}
-
-.win-host-code {
-    align-items: center;
-    background: rgba(96, 205, 255, 0.1);
-    border: 1px solid rgba(96, 205, 255, 0.2);
-    border-radius: 999px;
-    color: var(--win-accent);
-    display: inline-flex;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    line-height: 1;
-    padding: 4px 7px;
+        .win-host-name {
+            font-size: 12.5px;
+            font-weight: 600;
+        }
+    }
 }
 
 .win-host-input-area .win-input {
@@ -603,20 +589,21 @@ body {
     border-radius: var(--win-radius-sm);
     display: flex;
     gap: 2px;
-    min-width: 180px;
+    margin-inline: auto;
+    max-width: 180px;
     padding: 3px 8px;
     transition: all 0.15s ease;
-}
 
-.ipv4-input:focus-within {
-    background: rgba(255, 255, 255, 0.12);
-    border-bottom: 2px solid var(--win-accent);
-}
+    &:focus-within {
+        background: rgba(255, 255, 255, 0.12);
+        border-bottom: 2px solid var(--win-accent);
+    }
 
-.ipv4-input.has-error {
-    background: var(--win-error-bg);
-    border: 1px solid var(--win-error);
-    border-bottom: 2px solid var(--win-error);
+    &.has-error {
+        background: var(--win-error-bg);
+        border: 1px solid var(--win-error);
+        border-bottom: 2px solid var(--win-error);
+    }
 }
 
 .ipv4-input-segment {
@@ -630,13 +617,19 @@ body {
     padding: 4px 0;
     text-align: center;
     width: 34px;
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: 0.55;
+    }
+
+    &::placeholder {
+        color: var(--win-text-secondary);
+    }
+
 }
 
-.ipv4-input-segment::placeholder {
-    color: var(--win-text-secondary);
-}
-
-.ipv4-input-separator {
+.ipv4-input-segment .ipv4-input-separator {
     color: var(--win-text-secondary);
     font-size: 13px;
     user-select: none;
