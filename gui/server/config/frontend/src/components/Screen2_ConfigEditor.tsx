@@ -5,7 +5,6 @@ import {
     Switch,
     Dropdown,
     Option,
-    Input,
     SpinButton,
     Field,
     Badge,
@@ -165,14 +164,15 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
         });
     };
 
-    const handleGameHostChange = (gameId: string, value: string) => {
-        const hostList = value.split(',').map((s) => s.trim());
+    const handleGameHostChange = (gameId: string, index: number, value: string) => {
+        const hosts = [...(config.Games[gameId]?.Hosts ?? [])];
+        hosts[index] = value;
         setConfig({
             ...config,
             Games: {
                 ...config.Games,
                 [gameId]: {
-                    Hosts: hostList,
+                    Hosts: hosts,
                 },
             },
         });
@@ -447,22 +447,25 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                                     {AVAILABLE_GAMES.map((game) => {
                                         const gameConf = config.Games[game.id];
                                         const gameHosts = gameConf && Array.isArray(gameConf.Hosts) ? gameConf.Hosts : ['0.0.0.0'];
-                                        const hostStr = gameHosts.join(', ');
-                                        const hostError = allErrors[`Games.${game.id}.Hosts.0`];
+                                        const hosts = gameHosts.length > 0 ? gameHosts : ['0.0.0.0'];
 
                                         return (
                                             <div key={game.id} className="win-host-card">
                                                 <div className="win-host-info">
                                                     <span className="win-host-name">{game.name}</span>
-                                                    <Badge appearance="outline" size="extra-small">[{game.id}]</Badge>
                                                 </div>
-                                                <Field validationMessage={hostError} validationState={hostError ? 'error' : 'none'}>
-                                                    <Input
-                                                        value={hostStr}
-                                                        onChange={(_, data) => handleGameHostChange(game.id, data.value)}
-                                                        placeholder="0.0.0.0"
-                                                    />
-                                                </Field>
+                                                {hosts.map((host, index) => {
+                                                    const hostError = allErrors[`Games.${game.id}.Hosts.${index}`];
+                                                    return (
+                                                        <Field key={index} validationMessage={hostError} validationState={hostError ? 'error' : 'none'}>
+                                                            <IPv4Input
+                                                                value={host}
+                                                                onChange={(value) => handleGameHostChange(game.id, index, value)}
+                                                                placeholder="0.0.0.0"
+                                                            />
+                                                        </Field>
+                                                    );
+                                                })}
                                             </div>
                                         );
                                     })}

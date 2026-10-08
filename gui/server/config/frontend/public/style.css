@@ -577,8 +577,17 @@ body {
 }
 
 .win-host-code {
-    font-size: 11px;
+    align-items: center;
+    background: rgba(96, 205, 255, 0.1);
+    border: 1px solid rgba(96, 205, 255, 0.2);
+    border-radius: 999px;
     color: var(--win-accent);
+    display: inline-flex;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    padding: 4px 7px;
 }
 
 .win-host-input-area .win-input {
