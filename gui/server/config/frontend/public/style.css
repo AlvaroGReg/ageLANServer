@@ -553,8 +553,8 @@ body {
 
 /* Hosts Grid in Details */
 .win-hosts-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 12px;
 }
 
@@ -583,6 +583,65 @@ body {
 
 .win-host-input-area .win-input {
     width: 100%;
+}
+
+/* IPv4 input */
+.ipv4-input {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: var(--win-radius-sm);
+    display: flex;
+    gap: 2px;
+    min-width: 180px;
+    padding: 3px 8px;
+    transition: all 0.15s ease;
+}
+
+.ipv4-input:focus-within {
+    background: rgba(255, 255, 255, 0.12);
+    border-bottom: 2px solid var(--win-accent);
+}
+
+.ipv4-input.has-error {
+    background: var(--win-error-bg);
+    border: 1px solid var(--win-error);
+    border-bottom: 2px solid var(--win-error);
+}
+
+.ipv4-input-segment {
+    background: transparent;
+    border: 0;
+    color: var(--win-text);
+    font-family: inherit;
+    font-size: 13px;
+    min-width: 0;
+    outline: none;
+    padding: 4px 0;
+    text-align: center;
+    width: 34px;
+}
+
+.ipv4-input-segment::placeholder {
+    color: var(--win-text-secondary);
+}
+
+.ipv4-input-separator {
+    color: var(--win-text-secondary);
+    font-size: 13px;
+    user-select: none;
+}
+
+.ipv4-input-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.ipv4-input-error {
+    color: var(--win-error);
+    font-size: 11.5px;
 }
 
 /* Buttons */

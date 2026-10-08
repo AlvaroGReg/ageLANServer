@@ -34,6 +34,7 @@ import {
 } from '@fluentui/react-icons';
 import { AppConfig, ValidationErrors, AVAILABLE_GAMES } from '../types';
 import { validateIPv4, validateMulticastIPv4 } from '../validation';
+import { IPv4Input } from './WinUI/IPv4Input';
 import { ConfigFile, ConfigService, Configuration, ValidationError } from '../../bindings/changeme';
 
 function toServiceConfiguration(config: AppConfig): Configuration {
@@ -474,14 +475,14 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
 
             {/* SECTION 3: ANNOUNCEMENT */}
             <div className="win-card-group">
-                <h3 className="win-section-header">Announcement and Network Discovery (Announcement)</h3>
+                <h3 className="win-section-header">Announcement and Network Discovery</h3>
                 <div className="win-card-stack">
                     {/* Card 6: Announcement Enabled */}
                     <Card className="win-card">
                         <div className="win-setting-row-main">
                             <div className="win-setting-icon"><Megaphone24Regular /></div>
                             <div className="win-setting-text">
-                                <div className="win-setting-title">LAN Announcement (Enabled)</div>
+                                <div className="win-setting-title">LAN Announcement</div>
                                 <div className="win-setting-subtitle">
                                     Respond to automatic discovery queries on the local LAN.
                                 </div>
@@ -558,17 +559,14 @@ export const Screen2_ConfigEditor: React.FC<Screen2Props> = ({
                                 </div>
                             </div>
                             <div className="win-setting-control">
-                                <Field
-                                    validationMessage={allErrors['Announcement.MulticastGroup']}
-                                    validationState={allErrors['Announcement.MulticastGroup'] ? 'error' : 'none'}
-                                >
-                                    <Input
-                                        value={config.Announcement.MulticastGroup}
-                                        onChange={(_, data) => handleMulticastGroupChange(data.value)}
-                                        placeholder="239.31.97.8"
-                                        style={{ minWidth: 180 }}
-                                    />
-                                </Field>
+                                <IPv4Input
+                                    error={allErrors['Announcement.MulticastGroup']}
+                                    max="239.255.255.255"
+                                    min="224.0.0.0"
+                                    onChange={handleMulticastGroupChange}
+                                    placeholder="239.31.97.8"
+                                    value={config.Announcement.MulticastGroup}
+                                />
                             </div>
                         </div>
                     </Card>
